@@ -1,6 +1,11 @@
 import { Chapter, Manga } from "../data/mockData";
 
-const API_BASE = ((import.meta as unknown) as { env: { VITE_API_URL?: string } }).env.VITE_API_URL ?? "http://localhost:8000/api";
+const env = import.meta.env as unknown as {
+  VITE_API_URL?: string;
+  DEV?: boolean;
+};
+export const BACKEND_CONFIGURED = Boolean(env.VITE_API_URL || env.DEV);
+export const API_BASE = env.VITE_API_URL ?? (env.DEV ? "http://localhost:8000/api" : "/api");
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {

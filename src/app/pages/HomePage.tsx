@@ -6,7 +6,7 @@ import { Button } from "../components/ui/button";
 import { motion } from "motion/react";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { fetchManga, syncManga } from "../services/api";
+import { fetchManga, syncManga, BACKEND_CONFIGURED } from "../services/api";
 
 const fallbackManga = [...featuredManga, ...trendingManga, ...popularManga, ...newReleases];
 
@@ -14,8 +14,15 @@ export function HomePage() {
   const [manga, setManga] = useState<Manga[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [apiNotice, setApiNotice] = useState("");
+  const backendConfigured = BACKEND_CONFIGURED;
 
   const refreshFromBackend = async () => {
+    if (!backendConfigured) {
+      setManga(fallbackManga);
+      setApiNotice("No backend configured. Showing built-in demo manga.");
+      return false;
+    }
+
     const cached = await fetchManga(48);
     if (cached.length > 0) {
       setManga(cached);
@@ -28,6 +35,12 @@ export function HomePage() {
   };
 
   const handleSync = async () => {
+    if (!backendConfigured) {
+      setApiNotice("Sync unavailable because no backend API URL is configured. Set VITE_API_URL or run the backend locally.");
+      setManga(fallbackManga);
+      return;
+    }
+
     setIsSyncing(true);
     setApiNotice("");
     try {

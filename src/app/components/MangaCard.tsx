@@ -7,6 +7,15 @@ import { Manga } from "../data/mockData";
 import { useEffect, useState } from "react";
 import { getLibraryEntry, listenToLibraryChanges, toggleBookmark } from "../services/library";
 
+const SOURCE_LABELS: Record<string, string> = {
+  mangadex: 'MangaDex',
+  anilist: 'AniList',
+  myanimelist: 'MyAnimeList',
+  kitsu: 'Kitsu',
+  webtoons: 'Webtoon',
+  web: 'Scraped',
+};
+
 interface MangaCardProps {
   manga: Manga;
   index?: number;
@@ -104,13 +113,18 @@ export function MangaCard({ manga, index = 0 }: MangaCardProps) {
           </Button>
         </div>
 
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             <Star className="w-4 h-4 fill-[#FFD54F] text-[#FFD54F]" />
             <span className="font-medium">{manga.rating}</span>
           </div>
           <span>•</span>
           <span>{manga.chapters} chapters</span>
+          {manga.source && (
+            <Badge variant="secondary" className="px-2 py-1 text-xs uppercase">
+              {SOURCE_LABELS[manga.source] ?? manga.source}
+            </Badge>
+          )}
         </div>
 
         {manga.genres && (

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     mangadex_api_base: str = "https://api.mangadex.org"
     search_cache_ttl_seconds: int = 3600
     chapter_pages_cache_ttl_seconds: int = 900
+    db_cache_ttl_seconds: int = 300
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

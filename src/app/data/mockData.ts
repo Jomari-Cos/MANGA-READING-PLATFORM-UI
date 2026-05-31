@@ -13,6 +13,7 @@ export interface Manga {
   releaseYear: number;
   lastChapter?: string;
   progress?: number;
+  source?: string;
 }
 
 export interface Chapter {

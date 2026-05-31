@@ -137,6 +137,11 @@ export function MangaDetailPage() {
               <p className="text-muted-foreground mb-2">
                 <span className="text-foreground font-medium">Author:</span> {manga.author}
               </p>
+              {manga.source && (
+                <p className="text-muted-foreground mb-2">
+                  <span className="text-foreground font-medium">Source:</span> {manga.source === 'mangadex' ? 'MangaDex' : manga.source === 'anilist' ? 'AniList' : manga.source === 'myanimelist' ? 'MyAnimeList' : manga.source === 'kitsu' ? 'Kitsu' : manga.source === 'webtoons' ? 'Webtoon' : manga.source}
+                </p>
+              )}
 
               <div className="flex flex-wrap gap-2 mb-6">
                 {manga.genres.map(genre => (

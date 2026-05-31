@@ -1,6 +1,6 @@
 import { Chapter, Manga } from "../data/mockData";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
+const API_BASE = ((import.meta as unknown) as { env: { VITE_API_URL?: string } }).env.VITE_API_URL ?? "http://localhost:8000/api";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -15,12 +15,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function fetchManga(limit = 48): Promise<Manga[]> {
-  return request<Manga[]>(`/manga?limit=${limit}`);
+export async function fetchManga(limit = 48, source?: string): Promise<Manga[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (source) params.set("source", source);
+  return request<Manga[]>(`/manga?${params.toString()}`);
 }
 
-export async function searchManga(query: string, limit = 48): Promise<Manga[]> {
+export async function searchManga(query: string, limit = 48, source?: string): Promise<Manga[]> {
   const params = new URLSearchParams({ q: query, limit: String(limit) });
+  if (source) params.set("source", source);
   return request<Manga[]>(`/manga?${params.toString()}`);
 }
 

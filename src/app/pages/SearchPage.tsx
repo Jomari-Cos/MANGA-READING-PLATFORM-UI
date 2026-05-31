@@ -15,6 +15,15 @@ import { fetchManga, searchManga } from "../services/api";
 const allManga = [...featuredManga, ...trendingManga, ...popularManga, ...newReleases];
 const statuses = ['All', 'Ongoing', 'Completed', 'Hiatus'];
 const types = ['All', 'Manga', 'Manhwa', 'Manhua', 'Webtoon'];
+const sourceOptions = [
+  { label: 'All', value: 'all' },
+  { label: 'MangaDex', value: 'mangadex' },
+  { label: 'AniList', value: 'anilist' },
+  { label: 'MyAnimeList', value: 'myanimelist' },
+  { label: 'Kitsu', value: 'kitsu' },
+  { label: 'Webtoon', value: 'webtoons' },
+  { label: 'Scraped', value: 'web' },
+];
 const years = ['All', '2024', '2023', '2022', '2021', '2020', '2019', '2018'];
 
 export function SearchPage() {
@@ -23,6 +32,7 @@ export function SearchPage() {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedType, setSelectedType] = useState('All');
+  const [selectedSource, setSelectedSource] = useState('all');
   const [selectedYear, setSelectedYear] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<'rating' | 'views' | 'chapters'>('rating');
@@ -42,9 +52,10 @@ export function SearchPage() {
 
     const timeout = window.setTimeout(() => {
       setIsLoading(true);
+      const sourceParam = selectedSource === 'all' ? undefined : selectedSource;
       const load = query.trim()
-        ? searchManga(query.trim(), 48)
-        : fetchManga(48);
+        ? searchManga(query.trim(), 48, sourceParam)
+        : fetchManga(48, sourceParam);
 
       load
         .then((results) => {
@@ -59,7 +70,7 @@ export function SearchPage() {
     }, 350);
 
     return () => window.clearTimeout(timeout);
-  }, [query, searchMode]);
+  }, [query, searchMode, selectedSource]);
 
   const toggleGenre = (genre: string) => {
     if (genre === 'All') {
@@ -87,9 +98,10 @@ export function SearchPage() {
 
       const matchesStatus = selectedStatus === 'All' || manga.status === selectedStatus;
       const matchesType = selectedType === 'All' || manga.type === selectedType;
+      const matchesSource = selectedSource === 'all' || manga.source?.toLowerCase() === selectedSource.toLowerCase();
       const matchesYear = selectedYear === 'All' || manga.releaseYear.toString() === selectedYear;
 
-      return matchesQuery && matchesGenre && matchesStatus && matchesType && matchesYear;
+      return matchesQuery && matchesGenre && matchesStatus && matchesType && matchesSource && matchesYear;
     })
     .sort((a, b) => {
       if (sortBy === 'rating') return b.rating - a.rating;
@@ -181,6 +193,12 @@ export function SearchPage() {
                 <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedType('All')} />
               </Badge>
             )}
+            {selectedSource !== 'all' && (
+              <Badge className="bg-[#7C4DFF] gap-2">
+                {sourceOptions.find(option => option.value === selectedSource)?.label ?? selectedSource}
+                <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedSource('all')} />
+              </Badge>
+            )}
             {selectedYear !== 'All' && (
               <Badge className="bg-[#4CAF50] gap-2">
                 {selectedYear}
@@ -224,7 +242,7 @@ export function SearchPage() {
               </div>
 
               {/* Status, Type, Year */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium mb-2 block">Status</label>
                   <Select value={selectedStatus} onValueChange={setSelectedStatus}>
@@ -248,6 +266,20 @@ export function SearchPage() {
                     <SelectContent>
                       {types.map(type => (
                         <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Source</label>
+                  <Select value={selectedSource} onValueChange={setSelectedSource}>
+                    <SelectTrigger className="bg-background rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sourceOptions.map(source => (
+                        <SelectItem key={source.value} value={source.value}>{source.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

@@ -30,6 +30,7 @@ playwright_scraper = PlaywrightScraper()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
+    allow_origin_regex=settings.cors_origin_regex_value,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,7 +40,6 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup() -> None:
     await ensure_indexes()
-    await playwright_scraper.startup()
 
 
 @app.on_event("shutdown")

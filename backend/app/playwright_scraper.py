@@ -5,7 +5,7 @@ import re
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-from playwright.async_api import AsyncBrowser, async_playwright
+from playwright.async_api import Browser, async_playwright
 
 WEBTOON_DOMAINS = {
     "webtoons.com": "webtoons",
@@ -16,7 +16,7 @@ WEBTOON_DOMAINS = {
 
 class PlaywrightScraper:
     def __init__(self) -> None:
-        self.browser: AsyncBrowser | None = None
+        self.browser: Browser | None = None
         self._playwright = None
 
     async def startup(self) -> None:

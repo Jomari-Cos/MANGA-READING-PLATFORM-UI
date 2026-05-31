@@ -57,4 +57,37 @@
   - The repository contains both frontend (`src/`) and a simple Python backend (`backend/`).
   - If you want me to create the remote repo and push it for you, install and authenticate the GitHub CLI (`gh`) or provide the remote URL.
 
+  ## Deployment
+
+  ### 1. Deploy the backend to Railway
+
+  1. Create a MongoDB database first. MongoDB Atlas is the easiest hosted option.
+  2. In Railway, create a new service from this GitHub repo and set the root directory to `backend`.
+  3. Railway will use `backend/Dockerfile`.
+  4. Add these Railway variables:
+  ```bash
+  MONGODB_URI=mongodb+srv://USER:PASSWORD@cluster.example.mongodb.net/?retryWrites=true&w=majority
+  MONGODB_DB=manga_reader
+  CORS_ORIGINS=http://localhost:5173,https://YOUR-VERCEL-APP.vercel.app
+  CORS_ORIGIN_REGEX=https://.*\.vercel\.app
+  ```
+  5. After deploy, open `https://YOUR-RAILWAY-SERVICE.up.railway.app/api/health`. It should return `{"status":"ok"}`.
+
+  ### 2. Deploy the frontend to Vercel
+
+  1. In Vercel, import the same GitHub repo with the project root at the repository root.
+  2. Use the default Vite settings:
+  ```bash
+  Build Command: npm run build
+  Output Directory: dist
+  ```
+  3. Add this Vercel environment variable:
+  ```bash
+  VITE_API_URL=https://YOUR-RAILWAY-SERVICE.up.railway.app
+  ```
+  4. Deploy the frontend.
+  5. Copy the final Vercel URL back into Railway `CORS_ORIGINS`, then redeploy the Railway backend.
+
+  The included `vercel.json` keeps React Router pages working after refreshes, and `backend/.env.example` / `.env.example` show the production variables to copy.
+
   

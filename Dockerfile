@@ -26,9 +26,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN python -m pip install --upgrade pip setuptools wheel && pip install --no-cache-dir -r backend/requirements.txt
+RUN python -m playwright install --with-deps chromium
 
 COPY . .
 
 EXPOSE 8080
 
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8080}

@@ -163,12 +163,27 @@ async def scrape_mangadex(
     return manga_items
 
 
+@app.get("/api/scrape/mangadex", response_model=list[Manga], response_model_by_alias=False)
+async def scrape_mangadex_get(
+    limit: int = Query(default=24, ge=1, le=100),
+    refresh_chapters: bool = Query(default=False),
+) -> list[dict]:
+    """GET wrapper for `scrape_mangadex` for convenience. POST is preferred."""
+    return await scrape_mangadex(limit=limit, refresh_chapters=refresh_chapters)
+
+
 @app.post("/api/scrape/anilist", response_model=list[Manga], response_model_by_alias=False)
 async def scrape_anilist(limit: int = Query(default=24, ge=1, le=50)) -> list[dict]:
     manga_items = await anilist.popular(limit=limit)
     for manga in manga_items:
         await _save_manga(manga)
     return manga_items
+
+
+@app.get("/api/scrape/anilist", response_model=list[Manga], response_model_by_alias=False)
+async def scrape_anilist_get(limit: int = Query(default=24, ge=1, le=50)) -> list[dict]:
+    """GET wrapper for `scrape_anilist` for convenience. POST is preferred."""
+    return await scrape_anilist(limit=limit)
 
 
 @app.post("/api/scrape/myanimelist", response_model=list[Manga], response_model_by_alias=False)
@@ -188,6 +203,12 @@ async def scrape_myanimelist(limit: int = Query(default=24, ge=1, le=50)) -> lis
     return manga_items
 
 
+@app.get("/api/scrape/myanimelist", response_model=list[Manga], response_model_by_alias=False)
+async def scrape_myanimelist_get(limit: int = Query(default=24, ge=1, le=50)) -> list[dict]:
+    """GET wrapper for `scrape_myanimelist` for convenience. POST is preferred."""
+    return await scrape_myanimelist(limit=limit)
+
+
 @app.post("/api/scrape/kitsu", response_model=list[Manga], response_model_by_alias=False)
 async def scrape_kitsu(limit: int = Query(default=24, ge=1, le=50)) -> list[dict]:
     manga_items = await kitsu.popular(limit=limit)
@@ -205,6 +226,12 @@ async def scrape_kitsu(limit: int = Query(default=24, ge=1, le=50)) -> list[dict
     return manga_items
 
 
+@app.get("/api/scrape/kitsu", response_model=list[Manga], response_model_by_alias=False)
+async def scrape_kitsu_get(limit: int = Query(default=24, ge=1, le=50)) -> list[dict]:
+    """GET wrapper for `scrape_kitsu` for convenience. POST is preferred."""
+    return await scrape_kitsu(limit=limit)
+
+
 @app.post("/api/scrape/all", response_model=list[Manga], response_model_by_alias=False)
 async def scrape_all(
     limit: int = Query(default=24, ge=1, le=50),
@@ -220,6 +247,19 @@ async def scrape_all(
     return list(combined.values())
 
 
+@app.get("/api/scrape/all", response_model=list[Manga], response_model_by_alias=False)
+async def scrape_all_get(
+    limit: int = Query(default=24, ge=1, le=50),
+    refresh_chapters: bool = Query(default=False),
+) -> list[dict]:
+    """GET wrapper for `scrape_all` to allow browser-friendly requests.
+
+    Note: scraping is an action that modifies DB/cache; POST is preferred.
+    This wrapper simply forwards query params to the POST implementation.
+    """
+    return await scrape_all(limit=limit, refresh_chapters=refresh_chapters)
+
+
 @app.post("/api/scrape/url", response_model=Manga, response_model_by_alias=False)
 async def scrape_url(payload: ScrapeUrlRequest) -> dict:
     manga = await webtoon.scrape(str(payload.url), payload.type)
@@ -228,6 +268,16 @@ async def scrape_url(payload: ScrapeUrlRequest) -> dict:
     if chapters:
         await _save_chapters(manga["_id"], chapters)
     return manga
+
+
+@app.get("/api/scrape/url", response_model=Manga, response_model_by_alias=False)
+async def scrape_url_get(url: str = Query(...), type: str | None = Query(default=None)) -> dict:
+    """GET wrapper for `scrape_url` that accepts `url` and optional `type` query params.
+
+    POST with JSON body is preferred for arbitrary payloads.
+    """
+    payload = ScrapeUrlRequest(url=url, type=type)
+    return await scrape_url(payload)
 
 
 @app.get("/api/manga", response_model=list[Manga], response_model_by_alias=False)

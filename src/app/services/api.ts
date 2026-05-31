@@ -4,8 +4,18 @@ const env = import.meta.env as unknown as {
   VITE_API_URL?: string;
   DEV?: boolean;
 };
+
+function normalizeApiBase(url: string): string {
+  const cleanUrl = url.replace(/\/+$|\s+/g, "").replace(/\/api$/, "");
+  return `${cleanUrl}/api`;
+}
+
 export const BACKEND_CONFIGURED = Boolean(env.VITE_API_URL || env.DEV);
-export const API_BASE = env.VITE_API_URL ?? (env.DEV ? "http://localhost:8000/api" : "/api");
+export const API_BASE = env.VITE_API_URL
+  ? normalizeApiBase(env.VITE_API_URL)
+  : env.DEV
+  ? "http://localhost:8000/api"
+  : "/api";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {

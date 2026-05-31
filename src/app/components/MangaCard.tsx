@@ -1,5 +1,5 @@
 import { Star, Bookmark, BookOpen } from "lucide-react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";

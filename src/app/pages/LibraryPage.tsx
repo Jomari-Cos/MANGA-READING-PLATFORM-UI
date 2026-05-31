@@ -1,6 +1,6 @@
 import { BookMarked, BookOpen, CheckCircle2, Download, Clock, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { MangaCard } from "../components/MangaCard";
 import { Progress } from "../components/ui/progress";

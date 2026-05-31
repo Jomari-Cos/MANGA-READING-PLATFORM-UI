@@ -1,6 +1,6 @@
 import { Search, SlidersHorizontal, X, Image as ImageIcon, Type } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router";
+import { useSearchParams } from "react-router-dom";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";

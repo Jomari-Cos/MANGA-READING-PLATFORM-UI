@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { MangaCard } from "./MangaCard";
 import { Manga } from "../data/mockData";
 import { useRef } from "react";

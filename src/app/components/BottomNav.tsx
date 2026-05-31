@@ -1,5 +1,5 @@
 import { Home, Search, Library, TrendingUp, User } from "lucide-react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "motion/react";
 
 const navItems = [

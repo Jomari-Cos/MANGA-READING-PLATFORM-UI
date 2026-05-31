@@ -1,5 +1,5 @@
 import { Home, Search, Library, TrendingUp, User, ChevronLeft, ChevronRight, Crown } from "lucide-react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "./ui/button";
 import { motion, AnimatePresence } from "motion/react";
 

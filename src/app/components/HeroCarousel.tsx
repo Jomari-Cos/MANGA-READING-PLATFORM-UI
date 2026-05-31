@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Play, Bookmark, Star, ChevronLeft, ChevronRight, Eye } from "lucide-react";
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Manga } from "../data/mockData";

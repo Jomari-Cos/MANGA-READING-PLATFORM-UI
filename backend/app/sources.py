@@ -3,6 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from hashlib import sha1
 from typing import Any
+from urllib.parse import parse_qs, urlparse
+import json
+import re
 
 import httpx
 
@@ -142,6 +145,199 @@ class OpenGraphScraper:
         }
 
 
+class WebtoonScraper:
+    WEBTOON_DOMAINS = {
+        "webtoons.com": "webtoons",
+        "tapas.io": "tapas",
+        "lezhin.com": "lezhin",
+    }
+
+    def __init__(self) -> None:
+        self.client = httpx.AsyncClient(timeout=25, headers={"User-Agent": "MangaReaderPlatform/1.0"})
+
+    async def close(self) -> None:
+        await self.client.aclose()
+
+    async def scrape(self, url: str, content_type: str = "Manga") -> dict[str, Any]:
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+        site = next((value for key, value in self.WEBTOON_DOMAINS.items() if key in hostname), "")
+        if not site:
+            return await OpenGraphScraper().scrape(url, content_type)
+
+        response = await self.client.get(url)
+        response.raise_for_status()
+        html = response.text
+
+        title = self._meta(html, "og:title", "twitter:title") or self._guess_title(url)
+        description = self._meta(html, "og:description", "description", "twitter:description")
+        cover = self._meta(html, "og:image", "twitter:image") or ""
+        if site in {"webtoons", "tapas", "lezhin"}:
+            content_type = "Webtoon"
+
+        manga_id = self._series_id(site, parsed)
+        chapters = self._extract_chapters(site, html, manga_id)
+        last_chapter = chapters[-1]["number"] if chapters else None
+
+        return {
+            "_id": manga_id,
+            "title": title,
+            "cover": cover,
+            "rating": 0,
+            "chapters": len(chapters),
+            "status": "Ongoing",
+            "type": content_type,
+            "author": "Unknown",
+            "genres": [],
+            "synopsis": description,
+            "views": "0",
+            "releaseYear": datetime.now().year,
+            "lastChapter": last_chapter,
+            "source": site,
+            "sourceUrl": url,
+            "chapters_data": chapters,
+        }
+
+    def _meta(self, html: str, *keys: str) -> str:
+        lower = html.lower()
+        for key in keys:
+            patterns = [
+                f'property="{key.lower()}"',
+                f'name="{key.lower()}"',
+                f"property='{key.lower()}'",
+                f"name='{key.lower()}'",
+            ]
+            for pattern in patterns:
+                index = lower.find(pattern)
+                if index == -1:
+                    continue
+                content_index = lower.find("content=", index)
+                if content_index == -1:
+                    continue
+                quote = html[content_index + 8]
+                if quote not in '"\'':
+                    continue
+                start = content_index + 9
+                end = html.find(quote, start)
+                if end != -1:
+                    return html[start:end].strip()
+        return ""
+
+    def _guess_title(self, url: str) -> str:
+        return url.rstrip("/").split("/")[-1].replace("-", " ").title()
+
+    def _series_id(self, site: str, parsed: Any) -> str:
+        path_parts = [segment for segment in parsed.path.split("/") if segment]
+        if site == "webtoons":
+            title_no = parse_qs(parsed.query).get("title_no", [None])[0]
+            if title_no:
+                return f"webtoons-{title_no}"
+            if len(path_parts) >= 2 and path_parts[-1] == "list":
+                return f"webtoons-{path_parts[-2]}"
+            return f"webtoons-{path_parts[-1] if path_parts else sha1(parsed.path.encode('utf-8')).hexdigest()[:12]}"
+        if site == "tapas":
+            if len(path_parts) >= 2 and path_parts[0] == "series":
+                return f"tapas-{path_parts[1]}"
+            return f"tapas-{path_parts[-1] if path_parts else sha1(parsed.path.encode('utf-8')).hexdigest()[:12]}"
+        if site == "lezhin":
+            if "comic" in path_parts:
+                comic_index = path_parts.index("comic")
+                if comic_index + 1 < len(path_parts):
+                    return f"lezhin-{path_parts[comic_index + 1]}"
+            return f"lezhin-{path_parts[-1] if path_parts else sha1(parsed.path.encode('utf-8')).hexdigest()[:12]}"
+        return f"scraped-{sha1(url.encode('utf-8')).hexdigest()[:16]}"
+
+    def _extract_chapters(self, site: str, html: str, manga_id: str) -> list[dict[str, Any]]:
+        chapters: list[dict[str, Any]] = []
+        data = self._find_json_data(html)
+        if data:
+            episode_list = self._search_for_keys(data, ["episodes", "episodeList", "episode_list", "items", "chapters"])
+            if isinstance(episode_list, list):
+                chapters = self._normalize_episodes(episode_list, manga_id, site)
+
+        if not chapters:
+            chapters = self._find_episode_links(html, manga_id, site)
+
+        return chapters
+
+    def _find_json_data(self, html: str) -> Any | None:
+        match = re.search(r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>', html, re.S | re.I)
+        if not match:
+            return None
+        try:
+            return json.loads(match.group(1))
+        except ValueError:
+            return None
+
+    def _search_for_keys(self, value: Any, keys: list[str]) -> Any | None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in keys:
+                    return item
+                found = self._search_for_keys(item, keys)
+                if found is not None:
+                    return found
+        elif isinstance(value, list):
+            for item in value:
+                found = self._search_for_keys(item, keys)
+                if found is not None:
+                    return found
+        return None
+
+    def _normalize_episodes(self, items: list[Any], manga_id: str, source: str) -> list[dict[str, Any]]:
+        chapters: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            number = str(item.get("episodeNo") or item.get("episodeNumber") or item.get("id") or item.get("episodeId") or item.get("seq") or index + 1)
+            if number in seen:
+                continue
+            seen.add(number)
+            title = item.get("title") or item.get("episodeTitle") or item.get("subTitle") or f"Chapter {number}"
+            published = item.get("publishedAt") or item.get("createdAt") or item.get("uploadDate") or item.get("date")
+            chapter_id = item.get("id") or item.get("episodeId") or f"{manga_id}-{number}"
+            release_date = None
+            if published:
+                try:
+                    release_date = datetime.fromisoformat(published.replace("Z", "+00:00"))
+                except ValueError:
+                    release_date = None
+            chapters.append({
+                "_id": f"{source}-{manga_id}-chapter-{chapter_id}",
+                "manga_id": manga_id,
+                "number": number,
+                "title": title,
+                "releaseDate": release_date,
+                "read": False,
+                "source": source,
+            })
+        return chapters
+
+    def _find_episode_links(self, html: str, manga_id: str, source: str) -> list[dict[str, Any]]:
+        anchors = re.findall(r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)</a>', html, re.S | re.I)
+        chapters: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for href, label in anchors:
+            if "episode" not in href and "chap" not in href and "list" not in href:
+                continue
+            title_text = re.sub(r'<[^>]+>', '', label).strip()
+            number = str(len(chapters) + 1)
+            if number in seen:
+                continue
+            seen.add(number)
+            chapters.append({
+                "_id": f"{source}-{manga_id}-chapter-{number}",
+                "manga_id": manga_id,
+                "number": number,
+                "title": title_text or f"Chapter {number}",
+                "releaseDate": None,
+                "read": False,
+                "source": source,
+            })
+        return chapters
+
+
 class JikanClient:
     """Simple MyAnimeList client using the Jikan REST API (https://jikan.moe/).
 
@@ -194,6 +390,50 @@ class JikanClient:
             results.append(manga)
         return results
 
+    async def chapters(self, manga_id: str, limit: int = 100, order: str = "asc") -> list[dict[str, Any]]:
+        numeric_id = manga_id.split("myanimelist-", 1)[-1] if manga_id.startswith("myanimelist-") else manga_id
+        page = 1
+        per_page = min(limit, 100)
+        chapters: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        while True:
+            response = await self.client.get(
+                f"{self.endpoint}/manga/{numeric_id}/chapters",
+                params={"page": page, "limit": per_page},
+            )
+            response.raise_for_status()
+            data = response.json().get("data", [])
+            if not data:
+                break
+
+            for item in data:
+                attrs = item.get("attributes", {})
+                number = str(attrs.get("chapter") or attrs.get("chapter_number") or item.get("chapter") or "1")
+                if number in seen:
+                    continue
+                seen.add(number)
+                title = attrs.get("title") or f"Chapter {number}"
+                published = attrs.get("published") or attrs.get("createdAt") or attrs.get("uploadedAt")
+                chapter_id = item.get("id") or f"{numeric_id}-{number}"
+                chapters.append({
+                    "_id": f"myanimelist-{numeric_id}-chapter-{chapter_id}",
+                    "manga_id": f"myanimelist-{numeric_id}",
+                    "number": number,
+                    "title": title,
+                    "releaseDate": datetime.fromisoformat(published.replace("Z", "+00:00")) if published else None,
+                    "read": False,
+                    "source": "myanimelist",
+                })
+
+            if len(data) < per_page or len(chapters) >= limit:
+                break
+            page += 1
+
+        if order == "desc":
+            chapters.reverse()
+        return chapters
+
 
 class KitsuClient:
     """Basic Kitsu REST client for manga (https://kitsu.io/api).
@@ -208,6 +448,52 @@ class KitsuClient:
 
     async def close(self) -> None:
         await self.client.aclose()
+
+    async def chapters(self, manga_id: str, limit: int = 100, order: str = "asc") -> list[dict[str, Any]]:
+        numeric_id = manga_id.split("kitsu-", 1)[-1] if manga_id.startswith("kitsu-") else manga_id
+        page = 0
+        per_page = min(limit, 20)
+        chapters: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        while len(chapters) < limit:
+            response = await self.client.get(
+                f"{self.endpoint}/manga/{numeric_id}/chapters",
+                params={"page[limit]": per_page, "page[offset]": page * per_page},
+            )
+            response.raise_for_status()
+            data = response.json().get("data", [])
+            if not data:
+                break
+
+            for item in data:
+                attrs = item.get("attributes", {})
+                number = str(attrs.get("chapterNumber") or attrs.get("chapter") or item.get("chapter") or "1")
+                if number in seen:
+                    continue
+                seen.add(number)
+                title = attrs.get("title") or f"Chapter {number}"
+                published = attrs.get("publishedAt") or attrs.get("createdAt")
+                chapter_id = item.get("id") or f"{numeric_id}-{number}"
+                chapters.append({
+                    "_id": f"kitsu-{numeric_id}-chapter-{chapter_id}",
+                    "manga_id": f"kitsu-{numeric_id}",
+                    "number": number,
+                    "title": title,
+                    "releaseDate": datetime.fromisoformat(published.replace("Z", "+00:00")) if published else None,
+                    "read": False,
+                    "source": "kitsu",
+                })
+                if len(chapters) >= limit:
+                    break
+
+            if len(data) < per_page or len(chapters) >= limit:
+                break
+            page += 1
+
+        if order == "desc":
+            chapters.reverse()
+        return chapters
 
     async def popular(self, limit: int = 24) -> list[dict[str, Any]]:
         per_page = min(limit, 20)

@@ -8,7 +8,7 @@ from .database import chapter_collection, ensure_indexes, manga_collection
 from .image_search import average_hash, confidence_from_distance, hamming_distance, hash_remote_image
 from .mangadex import MangaDexClient
 from .models import Chapter, ChapterPages, ImageSearchResult, Manga, ScrapeUrlRequest
-from .sources import AniListClient, OpenGraphScraper, JikanClient, KitsuClient
+from .sources import AniListClient, OpenGraphScraper, JikanClient, KitsuClient, WebtoonScraper
 
 
 settings = get_settings()
@@ -16,6 +16,7 @@ app = FastAPI(title="Manga Reader API")
 client = MangaDexClient()
 anilist = AniListClient()
 open_graph = OpenGraphScraper()
+webtoon = WebtoonScraper()
 jikan = JikanClient()
 kitsu = KitsuClient()
 
@@ -37,6 +38,7 @@ async def startup() -> None:
 async def shutdown() -> None:
     await client.close()
     await anilist.close()
+    await webtoon.close()
     await jikan.close()
     await kitsu.close()
 
@@ -101,7 +103,7 @@ async def scrape_mangadex(
         existing_chapter_count = await chapter_collection.count_documents({"manga_id": manga["_id"]})
 
         should_fetch_chapters = refresh_chapters or not existing or existing_chapter_count == 0
-        chapters = await client.chapters(manga["_id"], limit=100, order="asc") if should_fetch_chapters else []
+        chapters = await client.chapters(manga["_id"], limit=500, order="asc") if should_fetch_chapters else []
 
         if chapters:
             ordered = sorted(chapters, key=_chapter_sort_key)
@@ -133,6 +135,15 @@ async def scrape_myanimelist(limit: int = Query(default=24, ge=1, le=50)) -> lis
     manga_items = await jikan.popular(limit=limit)
     for manga in manga_items:
         await _save_manga(manga)
+        try:
+            chapters = await jikan.chapters(manga["_id"], limit=500, order="asc")
+        except Exception:
+            chapters = []
+        if chapters:
+            ordered = sorted(chapters, key=_chapter_sort_key)
+            manga["chapters"] = len(ordered)
+            manga["lastChapter"] = ordered[-1]["number"]
+            await _save_chapters(manga["_id"], chapters)
     return manga_items
 
 
@@ -141,6 +152,15 @@ async def scrape_kitsu(limit: int = Query(default=24, ge=1, le=50)) -> list[dict
     manga_items = await kitsu.popular(limit=limit)
     for manga in manga_items:
         await _save_manga(manga)
+        try:
+            chapters = await kitsu.chapters(manga["_id"], limit=500, order="asc")
+        except Exception:
+            chapters = []
+        if chapters:
+            ordered = sorted(chapters, key=_chapter_sort_key)
+            manga["chapters"] = len(ordered)
+            manga["lastChapter"] = ordered[-1]["number"]
+            await _save_chapters(manga["_id"], chapters)
     return manga_items
 
 
@@ -161,8 +181,12 @@ async def scrape_all(
 
 @app.post("/api/scrape/url", response_model=Manga, response_model_by_alias=False)
 async def scrape_url(payload: ScrapeUrlRequest) -> dict:
-    manga = await open_graph.scrape(str(payload.url), payload.type)
-    return await _save_manga(manga)
+    manga = await webtoon.scrape(str(payload.url), payload.type)
+    chapters = manga.pop("chapters_data", None)
+    manga = await _save_manga(manga)
+    if chapters:
+        await _save_chapters(manga["_id"], chapters)
+    return manga
 
 
 @app.get("/api/manga", response_model=list[Manga], response_model_by_alias=False)

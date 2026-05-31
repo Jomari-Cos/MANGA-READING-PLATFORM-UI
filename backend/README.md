@@ -25,7 +25,7 @@ docker compose up -d mongo
 - `POST /api/scrape/anilist?limit=24` imports AniList manga/manhwa/manhua metadata into MongoDB.
 - `POST /api/scrape/all?limit=24` imports from all configured sources.
 - Add `refresh_chapters=true` to MangaDex/all sync only when you want to re-check chapters for existing titles. By default, sync updates existing manga metadata, adds new manga, and fetches chapters only for new or chapterless manga.
-- `POST /api/scrape/url` imports Open Graph metadata from a public manga/manhua/webtoon page URL.
+- `POST /api/scrape/url` imports metadata from a public manga/manhua/webtoon page URL and attempts to scrape chapters from supported webtoon sites like Webtoons, Tapas, and Lezhin.
 - `GET /api/manga` returns cached manga.
 - `GET /api/manga?q=one%20piece` searches MangaDex and caches results.
 - `GET /api/manga/{manga_id}/chapters?order=asc` returns cached/imported chapters from oldest to newest.

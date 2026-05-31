@@ -24,6 +24,13 @@ export async function searchManga(query: string, limit = 48): Promise<Manga[]> {
   return request<Manga[]>(`/manga?${params.toString()}`);
 }
 
+export async function scrapeMangaByUrl(url: string, type: "Manga" | "Manhwa" | "Manhua" | "Webtoon" = "Manga"): Promise<Manga> {
+  return request<Manga>(`/scrape/url`, {
+    method: "POST",
+    body: JSON.stringify({ url, type }),
+  });
+}
+
 export async function syncManga(limit = 24, refreshChapters = false): Promise<Manga[]> {
   const params = new URLSearchParams({
     limit: String(limit),

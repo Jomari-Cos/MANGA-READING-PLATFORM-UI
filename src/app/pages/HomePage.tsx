@@ -31,10 +31,10 @@ export function HomePage() {
     setIsSyncing(true);
     setApiNotice("");
     try {
-      const synced = await syncManga(24);
+      const synced = await syncManga(24, true);
       const cached = await fetchManga(48);
       setManga(cached);
-      setApiNotice(`Sync complete: updated existing titles and added new ones. ${synced.length} source items checked.`);
+      setApiNotice(`Sync complete: metadata and chapters refreshed. ${synced.length} source items checked.`);
     } catch {
       setApiNotice("Backend unavailable. Showing built-in demo manga until FastAPI and MongoDB are running.");
       setManga(fallbackManga);

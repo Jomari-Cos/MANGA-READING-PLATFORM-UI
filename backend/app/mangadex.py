@@ -147,25 +147,43 @@ class MangaDexClient:
         return [normalize_manga(item) for item in response.json().get("data", [])]
 
     async def chapters(self, manga_id: str, limit: int = 100, order: str = "asc") -> list[dict[str, Any]]:
-        response = await self.client.get(
-            f"/manga/{manga_id}/feed",
-            params=[
-                ("limit", min(limit, 500)),
-                ("translatedLanguage[]", "en"),
-                ("contentRating[]", "safe"),
-                ("contentRating[]", "suggestive"),
-                ("order[chapter]", "desc" if order == "desc" else "asc"),
-            ],
-        )
-        response.raise_for_status()
+        offset = 0
+        per_page = min(limit, 500)
         seen: set[str] = set()
         chapters: list[dict[str, Any]] = []
-        for item in response.json().get("data", []):
-            chapter = normalize_chapter(item, manga_id)
-            if chapter["number"] in seen:
-                continue
-            seen.add(chapter["number"])
-            chapters.append(chapter)
+
+        while len(chapters) < limit:
+            response = await self.client.get(
+                f"/manga/{manga_id}/feed",
+                params=[
+                    ("limit", per_page),
+                    ("offset", offset),
+                    ("translatedLanguage[]", "en"),
+                    ("contentRating[]", "safe"),
+                    ("contentRating[]", "suggestive"),
+                    ("order[chapter]", "desc" if order == "desc" else "asc"),
+                ],
+            )
+            response.raise_for_status()
+            data = response.json().get("data", [])
+            if not data:
+                break
+
+            for item in data:
+                chapter = normalize_chapter(item, manga_id)
+                if chapter["number"] in seen:
+                    continue
+                seen.add(chapter["number"])
+                chapters.append(chapter)
+                if len(chapters) >= limit:
+                    break
+
+            if len(data) < per_page or len(chapters) >= limit:
+                break
+            offset += per_page
+
+        if order == "desc":
+            chapters.reverse()
         return chapters
 
     async def chapter_pages(self, chapter_id: str, quality: str = "data") -> list[str]:

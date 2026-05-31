@@ -35,6 +35,7 @@ class Chapter(BaseModel):
     manga_id: str
     number: str
     title: str
+    url: str | None = None
     releaseDate: datetime | None = None
     read: bool = False
     source: str = "mangadex"

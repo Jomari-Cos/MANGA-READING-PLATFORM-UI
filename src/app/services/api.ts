@@ -6,7 +6,11 @@ const env = import.meta.env as unknown as {
 };
 
 function normalizeApiBase(url: string): string {
-  const cleanUrl = url.replace(/\/+$|\s+/g, "").replace(/\/api$/, "");
+  const trimmed = url.trim().replace(/\/+$|\s+/g, "");
+  const absoluteUrl = /^https?:\/\//i.test(trimmed) || trimmed.startsWith("//") || trimmed.startsWith("/")
+    ? trimmed
+    : `https://${trimmed}`;
+  const cleanUrl = absoluteUrl.replace(/\/api$/, "");
   return `${cleanUrl}/api`;
 }
 

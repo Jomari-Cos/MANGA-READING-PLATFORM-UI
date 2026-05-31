@@ -13,6 +13,7 @@ from .database import chapter_collection, ensure_indexes, image_collection, mang
 from .image_search import average_hash, confidence_from_distance, hamming_distance, hash_remote_image
 from .mangadex import MangaDexClient
 from .models import Chapter, ChapterPages, ImageSearchResult, Manga, ScrapeUrlRequest
+from .playwright_scraper import PlaywrightScraper
 from .sources import AniListClient, OpenGraphScraper, JikanClient, KitsuClient, WebtoonScraper
 
 
@@ -24,6 +25,7 @@ open_graph = OpenGraphScraper()
 webtoon = WebtoonScraper()
 jikan = JikanClient()
 kitsu = KitsuClient()
+playwright_scraper = PlaywrightScraper()
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,6 +39,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup() -> None:
     await ensure_indexes()
+    await playwright_scraper.startup()
 
 
 @app.on_event("shutdown")
@@ -46,6 +49,7 @@ async def shutdown() -> None:
     await webtoon.close()
     await jikan.close()
     await kitsu.close()
+    await playwright_scraper.close()
 
 
 @app.get("/api/health")
@@ -262,7 +266,7 @@ async def scrape_all_get(
 
 @app.post("/api/scrape/url", response_model=Manga, response_model_by_alias=False)
 async def scrape_url(payload: ScrapeUrlRequest) -> dict:
-    manga = await webtoon.scrape(str(payload.url), payload.type)
+    manga = await playwright_scraper.scrape_url(str(payload.url), payload.type)
     chapters = manga.pop("chapters_data", None)
     manga = await _save_manga(manga)
     if chapters:
@@ -398,7 +402,12 @@ async def get_chapter_pages(
     cache_key = f"chapter-pages:{chapter['_id']}:{quality}"
     pages = await get_cache(cache_key)
     if pages is None:
-        pages = await client.chapter_pages(chapter["_id"], quality=quality)
+        if chapter.get("source") == "mangadex":
+            pages = await client.chapter_pages(chapter["_id"], quality=quality)
+        elif chapter.get("url"):
+            pages = await playwright_scraper.chapter_pages(chapter["url"])
+        else:
+            raise HTTPException(status_code=404, detail="Readable chapter pages are not available for this source")
         await set_cache(cache_key, pages, settings.chapter_pages_cache_ttl_seconds)
     return {
         "chapterId": chapter["_id"],

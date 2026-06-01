@@ -9,7 +9,7 @@ from pymongo import UpdateOne
 
 from .cache import clear_cache, get_cache, set_cache
 from .config import get_settings
-from .database import chapter_collection, ensure_indexes, image_collection, manga_collection
+from .database import chapter_collection, ensure_indexes, image_collection, manga_collection, ping_database
 from .image_search import average_hash, confidence_from_distance, hamming_distance, hash_remote_image
 from .mangadex import MangaDexClient
 from .models import Chapter, ChapterPages, ImageSearchResult, Manga, ScrapeUrlRequest
@@ -26,6 +26,8 @@ webtoon = WebtoonScraper()
 jikan = JikanClient()
 kitsu = KitsuClient()
 playwright_scraper = PlaywrightScraper()
+database_ready = False
+database_error = ""
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,7 +41,14 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup() -> None:
-    await ensure_indexes()
+    global database_ready, database_error
+    try:
+        await ensure_indexes()
+        database_ready = True
+        database_error = ""
+    except Exception as exc:
+        database_ready = False
+        database_error = str(exc)
 
 
 @app.on_event("shutdown")
@@ -54,7 +63,20 @@ async def shutdown() -> None:
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok"}
+    global database_ready, database_error
+    try:
+        await ping_database()
+        database_ready = True
+        database_error = ""
+    except Exception as exc:
+        database_ready = False
+        database_error = str(exc)
+
+    return {
+        "status": "ok",
+        "database": "ok" if database_ready else "unavailable",
+        "databaseError": database_error if not database_ready else "",
+    }
 
 
 @app.delete("/api/cache")

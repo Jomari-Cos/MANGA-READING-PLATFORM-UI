@@ -6,8 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db: str = "manga_reader"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
-    cors_origin_regex: str = ""
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,https://manga-reading-platform-ui.vercel.app"
+    cors_origin_regex: str = r"https://.*\.vercel\.app"
     mangadex_api_base: str = "https://api.mangadex.org"
     search_cache_ttl_seconds: int = 3600
     chapter_pages_cache_ttl_seconds: int = 900

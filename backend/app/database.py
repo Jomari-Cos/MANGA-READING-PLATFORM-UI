@@ -13,7 +13,12 @@ image_collection = db["images"]
 cache_collection = db["api_cache"]
 
 
+async def ping_database() -> None:
+    await db.command("ping")
+
+
 async def ensure_indexes() -> None:
+    await ping_database()
     await manga_collection.create_index("title")
     await manga_collection.create_index("source")
     await chapter_collection.create_index([("manga_id", 1), ("number", 1)])
